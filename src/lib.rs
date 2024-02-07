@@ -184,53 +184,30 @@ pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
                 // get the address that results from the hash
                 let address = <&Address>::try_from(&res[12..]).unwrap();
 
-                // count total and leading zero bytes
-                let mut total = 0;
-                let mut leading = 0;
-                for (i, &b) in address.iter().enumerate() {
-                    if b == 0 {
-                        total += 1;
-                    } else if leading == 0 {
-                        // set leading on finding non-zero byte
-                        leading = i;
-                    }
-                }
-
-                // only proceed if there are at least three zero bytes
-                if total < 3 {
+                if address.starts_with(&[0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef]) {
+                    // Get the full salt used to create the address
+                    let header_hex_string = hex::encode(header);
+                    let body_hex_string = hex::encode(salt_incremented_segment);
+                    let full_salt = format!("0x{}{}", &header_hex_string[42..], &body_hex_string);
+                
+                    // Display the salt and the address. Adjust the output format as needed
+                    let output = format!("{full_salt} => {address}");
+                    println!("{output}");
+                
+                    // Create a lock on the file before writing
+                    file.lock_exclusive().expect("Couldn't lock file.");
+                
+                    // Write the result to file
+                    writeln!(&file, "{output}")
+                        .expect("Couldn't write to `efficient_addresses.txt` file.");
+                
+                    // Release the file lock
+                    file.unlock().expect("Couldn't unlock file.");
+                } else {
+                    // Skip all results that don't start with 'face'
                     return;
                 }
-
-                // look up the reward amount
-                let key = leading * 20 + total;
-                let reward_amount = rewards.get(&key);
-
-                // only proceed if an efficient address has been found
-                if reward_amount.is_none() {
-                    return;
-                }
-
-                // get the full salt used to create the address
-                let header_hex_string = hex::encode(header);
-                let body_hex_string = hex::encode(salt_incremented_segment);
-                let full_salt = format!("0x{}{}", &header_hex_string[42..], &body_hex_string);
-
-                // display the salt and the address.
-                let output = format!(
-                    "{full_salt} => {address} => {}",
-                    reward_amount.unwrap_or("0")
-                );
-                println!("{output}");
-
-                // create a lock on the file before writing
-                file.lock_exclusive().expect("Couldn't lock file.");
-
-                // write the result to file
-                writeln!(&file, "{output}")
-                    .expect("Couldn't write to `efficient_addresses.txt` file.");
-
-                // release the file lock
-                file.unlock().expect("Couldn't unlock file.")
+                
             });
     }
 }
@@ -483,9 +460,9 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             if solution == 0 {
                 continue;
             }
-
+        
             let solution = solution.to_le_bytes();
-
+        
             let mut solution_message = [0; 85];
             solution_message[0] = CONTROL_CHARACTER;
             solution_message[1..21].copy_from_slice(&config.factory_address);
@@ -493,52 +470,45 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             solution_message[41..45].copy_from_slice(&salt[..]);
             solution_message[45..53].copy_from_slice(&solution);
             solution_message[53..].copy_from_slice(&config.init_code_hash);
-
+        
             // create new hash object
             let mut hash = Keccak::v256();
-
+        
             // update with header
             hash.update(&solution_message);
-
+        
             // hash the payload and get the result
             let mut res: [u8; 32] = [0; 32];
             hash.finalize(&mut res);
-
-            // get the address that results from the hash
-            let address = <&Address>::try_from(&res[12..]).unwrap();
-
-            // count total and leading zero bytes
-            let mut total = 0;
-            let mut leading = 0;
-            for (i, &b) in address.iter().enumerate() {
-                if b == 0 {
-                    total += 1;
-                } else if leading == 0 {
-                    // set leading on finding non-zero byte
-                    leading = i;
-                }
+        
+            // Check if the address starts with 'facebeeeeeef'
+            if res[12..].starts_with(&[0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef]) {
+                // Convert the address to the desired format
+                let address = <&Address>::try_from(&res[12..]).unwrap();
+        
+                // Prepare the output string. You might adjust this part as needed
+                let output = format!(
+                    "0x{}{}{} => {}",
+                    hex::encode(config.calling_address),
+                    hex::encode(salt),
+                    hex::encode(solution),
+                    address
+                );
+        
+                // Log the found address
+                println!("{output}");
+                found_list.push(output.clone());
+        
+                // Ensure exclusive access to the file before writing
+                file.lock_exclusive().expect("Couldn't lock file.");
+        
+                // Write the found address to the file
+                writeln!(&file, "{output}").expect("Couldn't write to `efficient_addresses.txt` file.");
+        
+                // Release the file lock
+                file.unlock().expect("Couldn't unlock file.");
+                found += 1;
             }
-
-            let key = leading * 20 + total;
-            let reward = rewards.get(&key).unwrap_or("0");
-            let output = format!(
-                "0x{}{}{} => {} => {}",
-                hex::encode(config.calling_address),
-                hex::encode(salt),
-                hex::encode(solution),
-                address,
-                reward,
-            );
-
-            let show = format!("{output} ({leading} / {total})");
-            found_list.push(show.to_string());
-
-            file.lock_exclusive().expect("Couldn't lock file.");
-
-            writeln!(&file, "{output}").expect("Couldn't write to `efficient_addresses.txt` file.");
-
-            file.unlock().expect("Couldn't unlock file.");
-            found += 1;
         }
     }
 }
