@@ -184,7 +184,7 @@ pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
                 // get the address that results from the hash
                 let address = <&Address>::try_from(&res[12..]).unwrap();
 
-                if address.starts_with(&[0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef]) {
+                if address.starts_with(&[0xbe, 0xef]) {
                     // Get the full salt used to create the address
                     let header_hex_string = hex::encode(header);
                     let body_hex_string = hex::encode(salt_incremented_segment);
@@ -482,7 +482,7 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             hash.finalize(&mut res);
         
             // Check if the address starts with 'facebeeeeeef'
-            if res[12..].starts_with(&[0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef]) {
+            if res[12..].starts_with(&[0xbe, 0xef]) {
                 // Convert the address to the desired format
                 let address = <&Address>::try_from(&res[12..]).unwrap();
         
