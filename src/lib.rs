@@ -44,7 +44,6 @@ pub struct Config {
     pub init_code_hash: [u8; 32],
     pub gpu_device: u8,
     pub leading_zeroes_threshold: u8,
-    pub total_zeroes_threshold: u8,
 }
 
 /// Validate the provided arguments and construct the Config struct.
@@ -70,10 +69,6 @@ impl Config {
         let leading_zeroes_threshold_string = match args.next() {
             Some(arg) => arg,
             None => String::from("3"),
-        };
-        let total_zeroes_threshold_string = match args.next() {
-            Some(arg) => arg,
-            None => String::from("5"),
         };
 
         // convert main arguments from hex string to vector of bytes
@@ -105,15 +100,9 @@ impl Config {
         let Ok(leading_zeroes_threshold) = leading_zeroes_threshold_string.parse::<u8>() else {
             return Err("invalid leading zeroes threshold value supplied");
         };
-        let Ok(total_zeroes_threshold) = total_zeroes_threshold_string.parse::<u8>() else {
-            return Err("invalid total zeroes threshold value supplied");
-        };
 
         if leading_zeroes_threshold > 20 {
             return Err("invalid value for leading zeroes threshold argument. (valid: 0..=20)");
-        }
-        if total_zeroes_threshold > 20 && total_zeroes_threshold != 255 {
-            return Err("invalid value for total zeroes threshold argument. (valid: 0..=20 | 255)");
         }
 
         Ok(Self {
@@ -122,7 +111,6 @@ impl Config {
             init_code_hash,
             gpu_device,
             leading_zeroes_threshold,
-            total_zeroes_threshold,
         })
     }
 }
@@ -402,11 +390,10 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
                 // display information about the current search criteria
                 term.write_line(&format!(
                     "current search space: {}xxxxxxxx{:08x}\t\t\
-                     threshold: {} leading or {} total zeroes",
+                     threshold: {} leading",
                     hex::encode(salt),
                     BigEndian::read_u64(&view_buf),
-                    config.leading_zeroes_threshold,
-                    config.total_zeroes_threshold
+                    config.leading_zeroes_threshold
                 ))?;
 
                 // display recently found solutions based on terminal height
@@ -537,8 +524,6 @@ fn mk_kernel_src(config: &Config) -> String {
     }
     let lz = config.leading_zeroes_threshold;
     writeln!(src, "#define LEADING_ZEROES {lz}").unwrap();
-    let tz = config.total_zeroes_threshold;
-    writeln!(src, "#define TOTAL_ZEROES {tz}").unwrap();
 
     src.push_str(KERNEL_SRC);
 
