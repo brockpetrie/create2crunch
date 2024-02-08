@@ -482,7 +482,7 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             hash.finalize(&mut res);
         
             // Check if the address starts with 'facebeeeeeef'
-            if res[12..].starts_with(&[0xbe, 0xef, 0xbe, 0xef, 0xbe]) {
+            if res[12..].starts_with(&[0xbe, 0xef]) {
                 // Convert the address to the desired format
                 let address = <&Address>::try_from(&res[12..]).unwrap();
         
