@@ -188,14 +188,6 @@ static inline void keccakf(ulong *a)
 #undef o
 }
 
-#define hasTotal(d) ( \
-  (!(d[0])) + (!(d[1])) + (!(d[2])) + (!(d[3])) + \
-  (!(d[4])) + (!(d[5])) + (!(d[6])) + (!(d[7])) + \
-  (!(d[8])) + (!(d[9])) + (!(d[10])) + (!(d[11])) + \
-  (!(d[12])) + (!(d[13])) + (!(d[14])) + (!(d[15])) + \
-  (!(d[16])) + (!(d[17])) + (!(d[18])) + (!(d[19])) \
->= TOTAL_ZEROES)
-
 static inline bool hasLeading(uchar const *d)
 {
 // Assuming the pattern is "beefbeef" in hexadecimal
@@ -343,9 +335,6 @@ __kernel void hashMessage(
   // determine if the address meets the constraints
   if (
     hasLeading(digest) 
-#if TOTAL_ZEROES <= 20
-    || hasTotal(digest)
-#endif
   ) {
     // To be honest, if we are using OpenCL, 
     // we just need to write one solution for all practical purposes,
