@@ -1,4 +1,4 @@
-#![warn(unused_crate_dependencies, unreachable_pub)]
+#![warn(unreachable_pub)]
 #![deny(unused_must_use, rust_2018_idioms)]
 
 use alloy_primitives::{hex, Address, FixedBytes};
@@ -40,7 +40,6 @@ pub struct Config {
     pub calling_address: [u8; 20],
     pub init_code_hash: [u8; 32],
     pub gpu_device: u8,
-    pub leading_zeroes_threshold: u8,
 }
 
 /// Validate the provided arguments and construct the Config struct.
@@ -117,9 +116,6 @@ impl Config {
 pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
     // (create if necessary) and open a file where found salts will be written
     let file = output_file();
-
-    // create object for computing rewards (relative rarity) for a given address
-    let rewards = Reward::new();
 
     // begin searching for addresses
     loop {
