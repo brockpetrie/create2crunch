@@ -17,9 +17,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use terminal_size::{terminal_size, Height};
 use tiny_keccak::{Hasher, Keccak};
 
-mod reward;
-pub use reward::Reward;
-
 // workset size (tweak this!)
 const WORK_SIZE: u32 = 0xfffffff; // max. 0x15400000 to abs. max 0xffffffff
 
@@ -66,10 +63,6 @@ impl Config {
             Some(arg) => arg,
             None => String::from("255"), // indicates that CPU will be used.
         };
-        let leading_zeroes_threshold_string = match args.next() {
-            Some(arg) => arg,
-            None => String::from("3"),
-        };
 
         // convert main arguments from hex string to vector of bytes
         let Ok(factory_address_vec) = hex::decode(factory_address_string) else {
@@ -97,20 +90,12 @@ impl Config {
         let Ok(gpu_device) = gpu_device_string.parse::<u8>() else {
             return Err("invalid gpu device value");
         };
-        let Ok(leading_zeroes_threshold) = leading_zeroes_threshold_string.parse::<u8>() else {
-            return Err("invalid leading zeroes threshold value supplied");
-        };
-
-        if leading_zeroes_threshold > 20 {
-            return Err("invalid value for leading zeroes threshold argument. (valid: 0..=20)");
-        }
 
         Ok(Self {
             factory_address,
             calling_address,
             init_code_hash,
             gpu_device,
-            leading_zeroes_threshold,
         })
     }
 }
@@ -229,9 +214,6 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
 
     // (create if necessary) and open a file where found salts will be written
     let file = output_file();
-
-    // create object for computing rewards (relative rarity) for a given address
-    let rewards = Reward::new();
 
     // track how many addresses have been found and information about them
     let mut found: u64 = 0;
@@ -389,11 +371,9 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
 
                 // display information about the current search criteria
                 term.write_line(&format!(
-                    "current search space: {}xxxxxxxx{:08x}\t\t\
-                     threshold: {} leading",
+                    "current search space: {}xxxxxxxx{:08x}",
                     hex::encode(salt),
                     BigEndian::read_u64(&view_buf),
-                    config.leading_zeroes_threshold
                 ))?;
 
                 // display recently found solutions based on terminal height
@@ -467,35 +447,32 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             // hash the payload and get the result
             let mut res: [u8; 32] = [0; 32];
             hash.finalize(&mut res);
-        
-            // Check if the address starts with 'facebeeeeeef'
-            if res[12..].starts_with(&[0xbe, 0xef]) {
-                // Convert the address to the desired format
-                let address = <&Address>::try_from(&res[12..]).unwrap();
-        
-                // Prepare the output string. You might adjust this part as needed
-                let output = format!(
-                    "0x{}{}{} => {}",
-                    hex::encode(config.calling_address),
-                    hex::encode(salt),
-                    hex::encode(solution),
-                    address
-                );
-        
-                // Log the found address
-                println!("{output}");
-                found_list.push(output.clone());
-        
-                // Ensure exclusive access to the file before writing
-                file.lock_exclusive().expect("Couldn't lock file.");
-        
-                // Write the found address to the file
-                writeln!(&file, "{output}").expect("Couldn't write to `efficient_addresses.txt` file.");
-        
-                // Release the file lock
-                file.unlock().expect("Couldn't unlock file.");
-                found += 1;
-            }
+    
+            // Convert the address to the desired format
+            let address = <&Address>::try_from(&res[12..]).unwrap();
+    
+            // Prepare the output string. You might adjust this part as needed
+            let output = format!(
+                "0x{}{}{} => {}",
+                hex::encode(config.calling_address),
+                hex::encode(salt),
+                hex::encode(solution),
+                address
+            );
+    
+            // Log the found address
+            println!("{output}");
+            found_list.push(output.clone());
+    
+            // Ensure exclusive access to the file before writing
+            file.lock_exclusive().expect("Couldn't lock file.");
+    
+            // Write the found address to the file
+            writeln!(&file, "{output}").expect("Couldn't write to `efficient_addresses.txt` file.");
+    
+            // Release the file lock
+            file.unlock().expect("Couldn't unlock file.");
+            found += 1;
         }
     }
 }
@@ -522,8 +499,6 @@ fn mk_kernel_src(config: &Config) -> String {
     for (i, x) in factory.chain(caller).enumerate().chain(hash) {
         writeln!(src, "#define S_{} {}u", i + 1, x).unwrap();
     }
-    let lz = config.leading_zeroes_threshold;
-    writeln!(src, "#define LEADING_ZEROES {lz}").unwrap();
 
     src.push_str(KERNEL_SRC);
 
