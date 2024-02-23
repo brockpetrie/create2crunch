@@ -191,7 +191,7 @@ static inline void keccakf(ulong *a)
 static inline bool hasLeading(uchar const *d)
 {
    // Assuming the pattern is "beefbeef" in hexadecimal
-    uchar patternBytes[] = {0xBE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEF};
+    uchar patternBytes[] = {0xB0, 0xBB, 0x1E, 0xB0, 0xBB, 0x1E};
 
     // Compare the starting bytes with the pattern
     #pragma unroll
